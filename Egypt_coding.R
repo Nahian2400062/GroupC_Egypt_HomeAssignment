@@ -1,0 +1,283 @@
+# Install packages if not already installed 
+# install.packages("WDI")
+# install.packages("ggplot2")
+# install.packages("reshape2")
+# install.packages("dplyr")
+
+library(WDI)  # For downloading World Bank data
+library(ggplot2)  # For plotting
+library(reshape2)
+library(dplyr)   # For data manipulation
+WDIsearch("GDP per capita")
+
+# ---------------------------------------------------------------------------
+# 1. GDP per Capita
+# ---------------------------------------------------------------------------
+# -- 1.1 GDP per Capita (Chain-Linked Volume) for Egypt --
+# Set variables
+egypt_code <- "EGY"  # ISO-3 code for Egypt
+gdp_chain_indicator <- "NY.GDP.PCAP.KD"  # GDP per capita, constant US$
+# Download data from 1993 to 2023 (about 30 years)
+egypt_gdp <- WDI(
+  country  = egypt_code, 
+  indicator = gdp_chain_indicator, 
+  start    = 1993, 
+  end      = 2023
+)
+# Quick check
+head(egypt_gdp)
+# Plot GDP per capita over time
+ggplot(egypt_gdp, aes(x = year, y = NY.GDP.PCAP.KD)) +
+  geom_line(color = "blue", linewidth = 2) +
+  labs(
+    title = "Egypt GDP per Capita (Chain-Linked Volume, 1993-2023)",
+    x = "Year",
+    y = "GDP per Capita (constant US$)"
+  ) +
+  theme_minimal()
+
+# -- 1.2 GDP per Capita (PPP) Comparison in 2019 --
+# Define neighbors. You can choose whichever neighbors are most relevant.
+# Common neighbors for Egypt might be: Israel (ISR), Libya (LBY), Sudan (SDN), Saudi Arabia (SAU), Jordan (JOR)
+neighbors <- c("LBY", "ISR", "SAU", "SDN", "JOR")
+gdp_ppp_indicator <- "NY.GDP.PCAP.PP.CD"  # GDP per capita, PPP (current international $)
+# Download data for Egypt + neighbors in 2019
+countries_ppp <- c(egypt_code, neighbors)
+gdp_ppp_2019 <- WDI(
+  country   = countries_ppp, 
+  indicator = gdp_ppp_indicator, 
+  start     = 2019, 
+  end       = 2019
+)
+# Check the data
+gdp_ppp_2019
+# Plot a comparison bar chart
+ggplot(gdp_ppp_2019, aes(x = country, y = NY.GDP.PCAP.PP.CD, fill = country)) +
+  geom_bar(stat = "identity") +
+  labs(
+    title = "GDP per Capita (PPP) in 2019: Egypt vs. Neighbors",
+    x = "Country",
+    y = "GDP per Capita (PPP, current int'l $)",
+    fill = "Country"
+  ) +
+  theme_minimal()
+
+# ---------------------------------------------------------------------------
+# 2. Population
+# ---------------------------------------------------------------------------
+
+# -- 2.1 Total Population --
+# Download total population data for Egypt from 1960 to the latest available
+pop_data <- WDI(
+  country   = egypt_code,
+  indicator = "SP.POP.TOTL",
+  start     = 1960,
+  end       = 2023
+)
+head(pop_data)
+# Plot total population over time
+ggplot(pop_data, aes(x = year, y = SP.POP.TOTL)) +
+  geom_line(color = "red", linewidth = 2) +
+  labs(
+    title = "Egypt Total Population (1960-2023)",
+    x = "Year",
+    y = "Total Population"
+  ) +
+  theme_minimal()
+
+# -- 2.2 Age Structure --
+# Indicators for age groups:
+# SP.POP.0014.TO.ZS = Ages 0-14 (% of total)
+# SP.POP.1564.TO.ZS = Ages 15-64 (% of total)
+# SP.POP.65UP.TO.ZS = Ages 65+ (% of total)
+age_structure_data <- WDI(
+  country = egypt_code,
+  indicator = c("SP.POP.0014.TO.ZS", "SP.POP.1564.TO.ZS", "SP.POP.65UP.TO.ZS"),
+  start = 1960,
+  end   = 2023
+)
+head(age_structure_data)
+# Subset just the columns we need (year + the 3 age-share columns)
+age_data <- age_structure_data[, c("year", "SP.POP.0014.TO.ZS", "SP.POP.1564.TO.ZS", "SP.POP.65UP.TO.ZS")]
+# Melt the data for plotting
+age_melt <- melt(age_data, id.vars = "year", variable.name = "age_group", value.name = "percentage")
+# Rename the age groups for clarity (optional)
+age_melt$age_group <- factor(age_melt$age_group,
+                             levels = c("SP.POP.0014.TO.ZS", "SP.POP.1564.TO.ZS", "SP.POP.65UP.TO.ZS"),
+                             labels = c("0-14", "15-64", "65+")
+)
+# Plot the age structure over time (stacked area)
+ggplot(age_melt, aes(x = year, y = percentage, fill = age_group)) +
+  geom_area(alpha = 0.7) +
+  labs(
+    title = "Egypt Age Structure Over Time",
+    x = "Year",
+    y = "Percentage of Population",
+    fill = "Age Group"
+  ) +
+  theme_minimal()
+
+
+# ---------------------------------------------------------------------------
+# 3. Production Structure
+# ---------------------------------------------------------------------------
+
+# -- 3.1 Employment Shares --
+# Indicators:
+# SL.AGR.EMPL.ZS = Employment in agriculture (% of total)
+# SL.IND.EMPL.ZS = Employment in industry (% of total)
+# SL.SRV.EMPL.ZS = Employment in services (% of total)
+emp_data <- WDI(
+  country = egypt_code,
+  indicator = c("SL.AGR.EMPL.ZS", "SL.IND.EMPL.ZS", "SL.SRV.EMPL.ZS"),
+  start = 1990,
+  end   = 2023
+)
+head(emp_data)
+# Plot employment shares
+ggplot(emp_data, aes(x = year)) +
+  geom_line(aes(y = SL.AGR.EMPL.ZS, color = "Agriculture"), linewidth = 2) +
+  geom_line(aes(y = SL.IND.EMPL.ZS, color = "Industry"), linewidth = 2) +
+  geom_line(aes(y = SL.SRV.EMPL.ZS, color = "Services"), linewidth = 2) +
+  labs(
+    title = "Egypt Employment Share by Sector (1990-2023)",
+    x = "Year",
+    y = "Percentage of Total Employment",
+    color = "Sector"
+  ) +
+  theme_minimal()
+
+# -- 3.2 Value Added Shares --
+# Indicators:
+# NV.AGR.TOTL.ZS = Agriculture value added (% of GDP)
+# NV.IND.TOTL.ZS = Industry value added (% of GDP)
+# NV.SRV.TOTL.ZS = Services value added (% of GDP)
+val_added_data <- WDI(
+  country   = egypt_code,
+  indicator = c("NV.AGR.TOTL.ZS", "NV.IND.TOTL.ZS", "NV.SRV.TOTL.ZS"),
+  start     = 1990,
+  end       = 2023
+)
+head(val_added_data)
+# Plot value added shares
+ggplot(val_added_data, aes(x = year)) +
+  geom_line(aes(y = NV.AGR.TOTL.ZS, color = "Agriculture"), linewidth = 2) +
+  geom_line(aes(y = NV.IND.TOTL.ZS, color = "Industry"), linewidth = 2) +
+  geom_line(aes(y = NV.SRV.TOTL.ZS, color = "Services"), linewidth = 2) +
+  labs(
+    title = "Egypt Value Added Share by Sector (1990-2023)",
+    x = "Year",
+    y = "Percentage of GDP",
+    color = "Sector"
+  ) +
+  theme_minimal()
+
+
+# ---------------------------------------------------------------------------
+# 4. Open Economy
+# ---------------------------------------------------------------------------
+
+WDIsearch("current account")
+WDIsearch("trade balance")
+WDIsearch("net foreign assets")
+# 1. Current Account Balance (% of GDP)
+# 2. Trade Balance (% of GDP) – calculated from exports and imports data
+# 3. Net Foreign Asset Position (% of GDP) – calculated from net foreign assets and GDP data
+# Set the analysis period (last 30 years)
+start_year <- 1960
+end_year   <- 2023
+# 1. Current Account (% GDP)
+# Alternative Indicator: BN.CAB.XOKA.GD.ZS - Current account balance (% of GDP)
+current_account <- WDI(country = "EGY", 
+                       indicator = "BN.CAB.XOKA.GD.ZS", 
+                       start = start_year, 
+                       end = end_year)
+# Check the first few rows to verify data
+head(current_account)
+# 2. Trade Balance (% GDP)
+# Since there is no direct trade balance (% GDP) indicator,
+# we calculate it using exports, imports, and GDP data.
+# Exports: NE.EXP.GNFS.CD - Exports of goods and services (current US$)
+# Imports: NE.IMP.GNFS.CD - Imports of goods and services (current US$)
+# GDP: NY.GDP.MKTP.CD - GDP (current US$)
+# Download exports data for Egypt
+exports <- WDI(country = "EGY", 
+               indicator = "NE.EXP.GNFS.CD", 
+               start = start_year, 
+               end = end_year)
+# Download imports data for Egypt
+imports <- WDI(country = "EGY", 
+               indicator = "NE.IMP.GNFS.CD", 
+               start = start_year, 
+               end = end_year)
+# Download GDP data (current US$) for Egypt
+gdp_current <- WDI(country = "EGY", 
+                   indicator = "NY.GDP.MKTP.CD", 
+                   start = start_year, 
+                   end = end_year)
+# Merge exports, imports, and GDP data by country code and year
+trade_data <- exports %>%
+  inner_join(imports, by = c("iso2c", "country", "year")) %>%
+  inner_join(gdp_current, by = c("iso2c", "country", "year"))
+# Calculate Trade Balance as (% of GDP)
+# Formula: ((Exports - Imports) / GDP) * 100
+trade_data <- trade_data %>%
+  mutate(trade_balance_pct = (NE.EXP.GNFS.CD - NE.IMP.GNFS.CD) / NY.GDP.MKTP.CD * 100)
+# Check calculated trade balance
+head(trade_data[, c("iso2c", "country", "year", "trade_balance_pct")])
+# 3. Net Foreign Asset Position (% GDP)
+# There is no direct indicator in % of GDP for net foreign assets.
+# We use the indicator for net foreign assets in current US$
+# and calculate the ratio relative to GDP (current US$).
+# Indicator for Net Foreign Assets (current US$):
+# NW.NFA.TO - Net foreign assets (current US$)
+nfa <- WDI(country = "EGY", 
+           indicator = "NW.NFA.TO", 
+           start = start_year, 
+           end = end_year)
+# Merge net foreign assets with GDP data (both in current US$)
+nfa_data <- nfa %>%
+  inner_join(gdp_current, by = c("iso2c", "country", "year"))
+# Calculate Net Foreign Asset Position as (% of GDP)
+# Formula: (Net Foreign Assets / GDP) * 100
+nfa_data <- nfa_data %>%
+  mutate(nfa_pct = (NW.NFA.TO / NY.GDP.MKTP.CD) * 100)
+# Check calculated net foreign asset position
+head(nfa_data[, c("iso2c", "country", "year", "nfa_pct")])
+# Combine all three indicators into one data frame
+# Merge the datasets by year for easy comparison.
+combined <- current_account %>%
+  select(iso2c, country, year, current_account_pct = BN.CAB.XOKA.GD.ZS) %>%
+  inner_join(trade_data %>% select(iso2c, country, year, trade_balance_pct), 
+             by = c("iso2c", "country", "year")) %>%
+  inner_join(nfa_data %>% select(iso2c, country, year, nfa_pct), 
+             by = c("iso2c", "country", "year"))
+# View combined data
+head(combined)
+# Plotting the Indicators Over Time
+# Plot 1: Current Account (% GDP)
+ggplot(combined, aes(x = year, y = current_account_pct)) +
+  geom_line(color = "blue", linewidth = 2) +
+  geom_point(color = "blue") +
+  labs(title = "Egypt Current Account (% GDP)",
+       x = "Year",
+       y = "Current Account (% GDP)") +
+  theme_minimal()
+# Plot 2: Trade Balance (% GDP)
+ggplot(combined, aes(x = year, y = trade_balance_pct)) +
+  geom_line(color = "red", linewidth = 2) +
+  geom_point(color = "red") +
+  labs(title = "Egypt Trade Balance (% GDP)",
+       x = "Year",
+       y = "Trade Balance (% GDP)") +
+  theme_minimal()
+# Plot 3: Net Foreign Asset Position (% GDP)
+ggplot(combined, aes(x = year, y = nfa_pct)) +
+  geom_line(color = "green", linewidth = 2) +
+  geom_point(color = "green") +
+  labs(title = "Egypt Net Foreign Asset Position (% GDP)",
+       x = "Year",
+       y = "Net Foreign Assets (% GDP)") +
+  theme_minimal()
+
+
